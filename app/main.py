@@ -38,7 +38,6 @@ def model(name: str) -> dict:
 def home() -> dict:
     return {"message": "Mushroom classification API", "docs": "/docs", "health": "/health"}
 
-
 @app.get("/health", tags=["service"])
 def health() -> dict:
     return {"status": "ok", "models": {name: bundle is not None for name, bundle in MODELS.items()}}

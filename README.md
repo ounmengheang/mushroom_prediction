@@ -1,22 +1,39 @@
-# Mushroom Model
+# Mushroom Classification API
 
-This project trains a binary classifier from `mushrooms.csv`. The `class` column is the target:
-`e` means edible and `p` means poisonous. The remaining 22 columns are categorical mushroom
-features and are one-hot encoded before logistic regression.
+A small project training a categorical mushroom classifier, saves the complete preprocessing/model bundle with joblib, and serve predictions through FastAPI.
 
-## Train
+> **Safety:** This is an educational model trained on a limited dataset. Never use it to decide
+> whether a real mushroom is safe to touch or eat.
 
-```powershell
+## Setup and run
+
+```bash
+cd "/Users/vatheka/Desktop/dichi/Techprenuer-2.0/AI Deployment/mushroom-classification-project"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 python train_mushroom.py
-```
-
-The model is saved to `models/mushroom.joblib`.
-
-## Run the API
-
-```powershell
 fastapi dev app/main.py
 ```
 
-Send a record using the same feature names as the CSV to `POST /mushroom/predict`. Interactive
-documentation is available at `/docs`.
+Open <http://127.0.0.1:8000/docs> for the interactive API documentation.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Service and model status |
+| `GET` | `/models` | Training metadata and held-out metrics |
+| `POST` | `/mushroom/predict` | Classify one mushroom |
+| `POST` | `/mushroom/predict/batch` | Classify up to 1,000 mushrooms |
+
+The API accepts the letter codes used by `mushrooms.csv`. Ready-to-run examples are in
+`requests.http`.
+
+## Tests
+
+```bash
+pytest
+```
+
+Tests train into a temporary directory, so they do not overwrite the deployed model.

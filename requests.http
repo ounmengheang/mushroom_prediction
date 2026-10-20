@@ -1,0 +1,34 @@
+### Health
+GET http://127.0.0.1:8000/health
+
+### Model metadata
+GET http://127.0.0.1:8000/models
+
+### Predict one mushroom (the first poisonous row in mushrooms.csv)
+POST http://127.0.0.1:8000/mushroom/predict
+Content-Type: application/json
+
+{
+  "cap-shape": "x",
+  "cap-surface": "s",
+  "cap-color": "n",
+  "bruises": "t",
+  "odor": "p",
+  "gill-attachment": "f",
+  "gill-spacing": "c",
+  "gill-size": "n",
+  "gill-color": "k",
+  "stalk-shape": "e",
+  "stalk-root": "e",
+  "stalk-surface-above-ring": "s",
+  "stalk-surface-below-ring": "s",
+  "stalk-color-above-ring": "w",
+  "stalk-color-below-ring": "w",
+  "veil-color": "w",
+  "ring-number": "o",
+  "ring-type": "p",
+  "spore-print-color": "k",
+  "population": "s",
+  "habitat": "u"
+}
+

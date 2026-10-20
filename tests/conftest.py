@@ -1,5 +1,6 @@
-"""Train the mushroom model once into a temporary folder for the test session."""
+from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import train_mushroom
@@ -13,6 +14,14 @@ def models_dir(tmp_path_factory):
     return path
 
 
+@pytest.fixture(scope="session")
+def example_rows():
+    frame = pd.read_csv(train_mushroom.DATA, dtype=str)
+    edible = frame.loc[frame["class"] == "e", train_mushroom.FEATURES].iloc[0].to_dict()
+    poisonous = frame.loc[frame["class"] == "p", train_mushroom.FEATURES].iloc[0].to_dict()
+    return edible, poisonous
+
+
 @pytest.fixture
 def client(models_dir, monkeypatch):
     from fastapi.testclient import TestClient
@@ -20,5 +29,5 @@ def client(models_dir, monkeypatch):
     from app.main import app
 
     monkeypatch.setattr(ml, "MODELS_DIR", models_dir)
-    with TestClient(app) as test_client:  # `with` runs the lifespan: the models are loaded
+    with TestClient(app) as test_client:
         yield test_client

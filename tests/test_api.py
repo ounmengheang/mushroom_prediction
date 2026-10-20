@@ -1,23 +1,39 @@
-"""The API accepts mushrooms.csv-shaped records and returns a class prediction."""
+def test_health_and_model_info(client):
+    assert client.get("/health").json() == {"status": "ok", "models": {"mushroom": True}}
+    model = client.get("/models").json()[0]
+    assert model["loaded"] is True
+    assert model["metrics"]["recall"] > 0.95
 
-import pandas as pd
+
+def test_known_edible_and_poisonous_rows(client, example_rows):
+    edible, poisonous = example_rows
+    edible_result = client.post("/mushroom/predict", json=edible)
+    poisonous_result = client.post("/mushroom/predict", json=poisonous)
+    assert edible_result.status_code == 200
+    assert poisonous_result.status_code == 200
+    assert edible_result.json()["classification"] == "edible"
+    assert poisonous_result.json()["classification"] == "poisonous"
 
 
-def test_mushroom_prediction(client):
-    row = pd.read_csv("mushrooms.csv").drop(columns=["class"]).iloc[0].to_dict()
-    response = client.post("/mushroom/predict", json=row)
-
+def test_batch_prediction_preserves_order(client, example_rows):
+    edible, poisonous = example_rows
+    response = client.post(
+        "/mushroom/predict/batch", json={"mushrooms": [edible, poisonous]}
+    )
     assert response.status_code == 200
-    body = response.json()
-    assert body["label"] in {"e", "p"}
-    assert body["class_name"] in {"edible", "poisonous"}
-    assert set(body["probabilities"]) == {"e", "p"}
+    assert [item["classification"] for item in response.json()] == ["edible", "poisonous"]
 
 
-def test_mushroom_prediction_rejects_unknown_columns(client):
-    row = pd.read_csv("mushrooms.csv").drop(columns=["class"]).iloc[0].to_dict()
-    row["not-a-mushroom-feature"] = "x"
+def test_invalid_category_and_missing_field_return_422(client, example_rows):
+    edible, _ = example_rows
+    invalid = edible | {"odor": "invalid"}
+    assert client.post("/mushroom/predict", json=invalid).status_code == 422
 
-    response = client.post("/mushroom/predict", json=row)
+    missing = edible.copy()
+    missing.pop("odor")
+    assert client.post("/mushroom/predict", json=missing).status_code == 422
 
-    assert response.status_code == 422
+
+def test_extra_field_returns_422(client, example_rows):
+    edible, _ = example_rows
+    assert client.post("/mushroom/predict", json=edible | {"class": "e"}).status_code == 422

@@ -1,56 +1,92 @@
-"""Request and response models for the mushroom classifier API."""
+"""Pydantic request and response models used by the API."""
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 EXAMPLE_MUSHROOM = {
-    "cap-shape": "x", "cap-surface": "s", "cap-color": "n", "bruises": "t", "odor": "p",
-    "gill-attachment": "f", "gill-spacing": "c", "gill-size": "n", "gill-color": "k",
-    "stalk-shape": "e", "stalk-root": "e", "stalk-surface-above-ring": "s",
-    "stalk-surface-below-ring": "s", "stalk-color-above-ring": "w", "stalk-color-below-ring": "w",
-    "veil-type": "p", "veil-color": "w", "ring-number": "o", "ring-type": "p",
-    "spore-print-color": "k", "population": "s", "habitat": "u",
+    "cap-shape": "x",
+    "cap-surface": "s",
+    "cap-color": "n",
+    "bruises": "t",
+    "odor": "p",
+    "gill-attachment": "f",
+    "gill-spacing": "c",
+    "gill-size": "n",
+    "gill-color": "k",
+    "stalk-shape": "e",
+    "stalk-root": "e",
+    "stalk-surface-above-ring": "s",
+    "stalk-surface-below-ring": "s",
+    "stalk-color-above-ring": "w",
+    "stalk-color-below-ring": "w",
+    "veil-color": "w",
+    "ring-number": "o",
+    "ring-type": "p",
+    "spore-print-color": "k",
+    "population": "s",
+    "habitat": "u",
 }
 
 
 class Mushroom(BaseModel):
-    """One mushroom using the categorical columns from mushrooms.csv."""
+    """The 21 useful categorical observations for one mushroom."""
 
-    model_config = {"extra": "forbid", "populate_by_name": True,
-                    "json_schema_extra": {"examples": [EXAMPLE_MUSHROOM]}}
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        json_schema_extra={"examples": [EXAMPLE_MUSHROOM]},
+    )
 
-    cap_shape: str = Field(alias="cap-shape", min_length=1)
-    cap_surface: str = Field(alias="cap-surface", min_length=1)
-    cap_color: str = Field(alias="cap-color", min_length=1)
-    bruises: str = Field(min_length=1)
-    odor: str = Field(min_length=1)
-    gill_attachment: str = Field(alias="gill-attachment", min_length=1)
-    gill_spacing: str = Field(alias="gill-spacing", min_length=1)
-    gill_size: str = Field(alias="gill-size", min_length=1)
-    gill_color: str = Field(alias="gill-color", min_length=1)
-    stalk_shape: str = Field(alias="stalk-shape", min_length=1)
-    stalk_root: str = Field(alias="stalk-root", min_length=1)
-    stalk_surface_above_ring: str = Field(alias="stalk-surface-above-ring", min_length=1)
-    stalk_surface_below_ring: str = Field(alias="stalk-surface-below-ring", min_length=1)
-    stalk_color_above_ring: str = Field(alias="stalk-color-above-ring", min_length=1)
-    stalk_color_below_ring: str = Field(alias="stalk-color-below-ring", min_length=1)
-    veil_type: str = Field(alias="veil-type", min_length=1)
-    veil_color: str = Field(alias="veil-color", min_length=1)
-    ring_number: str = Field(alias="ring-number", min_length=1)
-    ring_type: str = Field(alias="ring-type", min_length=1)
-    spore_print_color: str = Field(alias="spore-print-color", min_length=1)
-    population: str = Field(min_length=1)
-    habitat: str = Field(min_length=1)
+    cap_shape: Literal["b", "c", "f", "k", "s", "x"] = Field(alias="cap-shape")
+    cap_surface: Literal["f", "g", "s", "y"] = Field(alias="cap-surface")
+    cap_color: Literal["b", "c", "e", "g", "n", "p", "r", "u", "w", "y"] = Field(
+        alias="cap-color"
+    )
+    bruises: Literal["f", "t"]
+    odor: Literal["a", "c", "f", "l", "m", "n", "p", "s", "y"]
+    gill_attachment: Literal["a", "f"] = Field(alias="gill-attachment")
+    gill_spacing: Literal["c", "w"] = Field(alias="gill-spacing")
+    gill_size: Literal["b", "n"] = Field(alias="gill-size")
+    gill_color: Literal["b", "e", "g", "h", "k", "n", "o", "p", "r", "u", "w", "y"] = Field(
+        alias="gill-color"
+    )
+    stalk_shape: Literal["e", "t"] = Field(alias="stalk-shape")
+    stalk_root: Literal["?", "b", "c", "e", "r"] = Field(alias="stalk-root")
+    stalk_surface_above_ring: Literal["f", "k", "s", "y"] = Field(
+        alias="stalk-surface-above-ring"
+    )
+    stalk_surface_below_ring: Literal["f", "k", "s", "y"] = Field(
+        alias="stalk-surface-below-ring"
+    )
+    stalk_color_above_ring: Literal["b", "c", "e", "g", "n", "o", "p", "w", "y"] = Field(
+        alias="stalk-color-above-ring"
+    )
+    stalk_color_below_ring: Literal["b", "c", "e", "g", "n", "o", "p", "w", "y"] = Field(
+        alias="stalk-color-below-ring"
+    )
+    veil_color: Literal["n", "o", "w", "y"] = Field(alias="veil-color")
+    ring_number: Literal["n", "o", "t"] = Field(alias="ring-number")
+    ring_type: Literal["e", "f", "l", "n", "p"] = Field(alias="ring-type")
+    spore_print_color: Literal["b", "h", "k", "n", "o", "r", "u", "w", "y"] = Field(
+        alias="spore-print-color"
+    )
+    population: Literal["a", "c", "n", "s", "v", "y"]
+    habitat: Literal["d", "g", "l", "m", "p", "u", "w"]
 
 
 class MushroomPrediction(BaseModel):
-    label: Literal["e", "p"]
-    class_name: Literal["edible", "poisonous"]
+    classification: Literal["edible", "poisonous"]
+    poisonous_probability: float = Field(ge=0, le=1)
     confidence: float = Field(ge=0, le=1)
-    probabilities: dict[str, float]
+    threshold: float = Field(ge=0, le=1)
+
+
+class MushroomBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mushrooms: list[Mushroom] = Field(min_length=1, max_length=1000)
 
 
 class ModelInfo(BaseModel):
@@ -58,4 +94,4 @@ class ModelInfo(BaseModel):
     loaded: bool
     algorithm: str | None = None
     trained_at: str | None = None
-    metrics: dict[str, float] = {}
+    metrics: dict[str, float] = Field(default_factory=dict)

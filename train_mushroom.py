@@ -1,83 +1,139 @@
-"""Train a classifier for the mushroom dataset and save it for the API."""
+"""Train, evaluate, and save the mushroom classifier."""
 
 from __future__ import annotations
 
-import argparse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-DATA_PATH = Path(__file__).parent / "mushrooms.csv"
+HERE = Path(__file__).parent
+DATA = HERE / "mushrooms.csv"
+MODELS = HERE / "models"
 TARGET = "class"
+FEATURES = [
+    "cap-shape",
+    "cap-surface",
+    "cap-color",
+    "bruises",
+    "odor",
+    "gill-attachment",
+    "gill-spacing",
+    "gill-size",
+    "gill-color",
+    "stalk-shape",
+    "stalk-root",
+    "stalk-surface-above-ring",
+    "stalk-surface-below-ring",
+    "stalk-color-above-ring",
+    "stalk-color-below-ring",
+    "veil-color",
+    "ring-number",
+    "ring-type",
+    "spore-print-color",
+    "population",
+    "habitat",
+]
 
 
-def train(
-    models_dir: str | Path | None = None,
-    data_path: str | Path = DATA_PATH,
-    verbose: bool = True,
-) -> dict:
-    """Train the mushroom classifier and return the saved model bundle."""
-    data = pd.read_csv(data_path)
-    if TARGET not in data.columns:
-        raise ValueError(f"Dataset must contain the {TARGET!r} target column")
+def step(title: str) -> None:
+    print(f"\n=== {title} " + "=" * max(0, 60 - len(title)))
 
-    features = [column for column in data.columns if column != TARGET]
-    x_train, x_test, y_train, y_test = train_test_split(
-        data[features], data[TARGET], test_size=0.2, random_state=42, stratify=data[TARGET]
+
+def build_model():
+    return make_pipeline(
+        OneHotEncoder(handle_unknown="ignore"),
+        RandomForestClassifier(
+            n_estimators=300,
+            min_samples_leaf=2,
+            class_weight="balanced_subsample",
+            random_state=42,
+            n_jobs=-1,
+        ),
     )
-    preprocessor = ColumnTransformer(
-        [("categorical", OneHotEncoder(handle_unknown="ignore"), features)],
-        remainder="drop",
-    )
-    pipeline = Pipeline(
-        [
-            ("preprocessor", preprocessor),
-            ("classifier", LogisticRegression(max_iter=1000, random_state=42)),
-        ]
-    )
-    pipeline.fit(x_train, y_train)
 
-    probabilities = pipeline.predict_proba(x_test)
-    predictions = pipeline.classes_[probabilities.argmax(axis=1)]
-    poisonous_index = list(pipeline.classes_).index("p")
+
+def choose_threshold(y_true: pd.Series, probabilities: np.ndarray) -> float:
+    """Prefer high poisonous recall, then choose the best precision among qualifying cutoffs."""
+    candidates = []
+    for threshold in np.arange(0.1, 0.91, 0.01):
+        predictions = probabilities >= threshold
+        recall = recall_score(y_true, predictions)
+        precision = precision_score(y_true, predictions, zero_division=0)
+        if recall >= 0.99:
+            candidates.append((precision, threshold))
+    return round(float(max(candidates)[1] if candidates else 0.5), 2)
+
+
+def train(data_path: Path = DATA, models_dir: Path = MODELS, verbose: bool = True) -> dict:
+    say = print if verbose else (lambda *args, **kwargs: None)
+    show = step if verbose else (lambda title: None)
+
+    show("1. Load and validate the data")
+    frame = pd.read_csv(data_path, dtype=str)
+    required = set(FEATURES) | {TARGET}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"Dataset is missing columns: {sorted(missing)}")
+    if not set(frame[TARGET].unique()) <= {"e", "p"}:
+        raise ValueError("The class column must contain only 'e' and 'p'.")
+    say(f"{len(frame):,} rows, {len(FEATURES)} useful categorical features")
+    say("veil-type is excluded because it has only one value")
+
+    X = frame[FEATURES]
+    y = frame[TARGET].map({"e": 0, "p": 1})
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+
+    show("2. Choose a safety-oriented threshold on training data")
+    model = build_model()
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    training_probabilities = cross_val_predict(
+        model, X_train, y_train, cv=folds, method="predict_proba", n_jobs=-1
+    )[:, 1]
+    threshold = choose_threshold(y_train, training_probabilities)
+    say(f"threshold: {threshold:.2f} (selected for at least 99% cross-validated poisonous recall)")
+
+    show("3. Fit and evaluate on the held-out test set")
+    model.fit(X_train, y_train)
+    probabilities = model.predict_proba(X_test)[:, 1]
+    predictions = probabilities >= threshold
     metrics = {
-        "accuracy": float(accuracy_score(y_test, predictions)),
-        "macro_f1": float(f1_score(y_test, predictions, average="macro")),
-        "roc_auc": float(roc_auc_score(y_test, probabilities[:, poisonous_index])),
+        "accuracy": round(accuracy_score(y_test, predictions), 4),
+        "precision": round(precision_score(y_test, predictions), 4),
+        "recall": round(recall_score(y_test, predictions), 4),
+        "f1": round(f1_score(y_test, predictions), 4),
+        "roc_auc": round(roc_auc_score(y_test, probabilities), 4),
     }
+    for name, value in metrics.items():
+        say(f"{name:<10} {value:.4f}")
+
+    show("4. Save the complete model bundle")
     bundle = {
-        "model": pipeline,
-        "features": features,
-        "target": TARGET,
-        "labels": list(pipeline.classes_),
-        "positive_label": "p",
+        "model": model,
+        "algorithm": "one-hot encoder + random forest",
+        "features": FEATURES,
+        "labels": {0: "edible", 1: "poisonous"},
+        "threshold": threshold,
         "metrics": metrics,
-        "algorithm": "logistic regression with one-hot encoding",
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "sklearn_version": sklearn.__version__,
     }
-
-    destination = Path(models_dir) if models_dir else Path(__file__).parent / "models"
-    destination.mkdir(parents=True, exist_ok=True)
-    joblib.dump(bundle, destination / "mushroom.joblib")
-    if verbose:
-        print(f"Saved mushroom model to {destination / 'mushroom.joblib'}")
-        print(metrics)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    path = models_dir / "mushroom.joblib"
+    joblib.dump(bundle, path)
+    say(f"saved to {path}")
     return bundle
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--models-dir", type=Path)
-    parser.add_argument("--data-path", type=Path, default=DATA_PATH)
-    args = parser.parse_args()
-    train(models_dir=args.models_dir, data_path=args.data_path)
+    train()

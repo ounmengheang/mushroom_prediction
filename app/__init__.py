@@ -1,1 +1,1 @@
-"""The API that serves the mushroom classification model."""
+"""Mushroom classification API package."""
